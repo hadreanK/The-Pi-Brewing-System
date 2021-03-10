@@ -4,6 +4,10 @@ Store temps and times (date/time format)
 
 
 Little things
--Settings file we can save to?
 -Modulate the duty cycle of the heaters
 -estimated time to target
+- Have LCD display esitmated time to target
+
+Hardware
+- make everything run off the 5V power supply, not the Pi power
+- Replace the thermometer(s)

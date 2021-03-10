@@ -1,18 +1,21 @@
 import RPi.GPIO as GPIO
 import time
+import sys
 from pygame import mixer
 
 
 class BrewLogic():
-    def __init__(self):
-        self.tempF = [0.0, 0.0, 0.0]
+    def __init__(self, nThermometers):
+        self.tempF = []
+        for i in range(0,nThermometers):
+            self.tempF.append(0.0)
         self.tempTimeStamp = 0.0
         self.heatOn = [False, False]
-        self.heatMode = 9 #0 is heat, 1 is maintain, 2 is cool, 9 is off
         self.heatEnabled = False
-        self.target = 190.0
         self.goodEnoughThreshold =200.0
         self.holdingDuty = 0.70
+        self.target = 0
+        self.heatMode = 0
         
         # Alarm Settings
         self.alarm = False
@@ -23,7 +26,6 @@ class BrewLogic():
         # Rate of change calcs
         self.tTT = []
         self.dtdT = [0.0, 0.0]
-        
         
         # Set Up Pins
         self.heat1Pin = 20
@@ -36,8 +38,9 @@ class BrewLogic():
         mixer.init()
         mixer.music.load('/home/pi/Documents/Beer Maker/The-Pi-Brewing-System/Sounds/Hospital Beep.mp3')
         
-        # Set up settings file stuff
+        # Set up settings file stuff and get the values from the file
         self.setFile = './settings.txt'
+        self.openSettingsFile()
         
         
     def brewCompute(self):
@@ -45,6 +48,7 @@ class BrewLogic():
         self.heaterControl()
         self.calcDTs()
         self.alarmControl()
+        self.saveSettingsFile()
 
     def heatCompute(self):
         # Decide if the haters should be turned on
@@ -102,7 +106,7 @@ class BrewLogic():
             self.lastAlarmTime = 0
             
     def calcDTs(self):
-        self.tTT.append([time.time(), self.tempF[0], self.tempF[2]])
+        self.tTT.append([time.time(), self.tempF[0], self.tempF[1]])
         ntTTs = len(self.tTT)
 
         nToAvg = min(ntTTs-2, 100)
@@ -119,5 +123,25 @@ class BrewLogic():
         # Set the alarm  and text
     def saveSettingsFile(self):
         f = open(self.setFile, 'w')
-        f.write("Settings file for the brassuer")
+        originalStdout = sys.stdout
+        sys.stdout = f
+        print("Settings file for the Brasseur\n")
+        print("heatMode\n%d \n" % self.heatMode)
+        print("target\n%d \n" % self.target)
+        sys.stdout = originalStdout
+        
+    def openSettingsFile(self):
+        f = open(self.setFile, 'r')
+        lines = f.readlines()
+        f.close
+        print("Reading from settings file...")
+        i = 1
+        for line in lines:
+            if(i == 4):
+                self.heatMode = int(line)
+            if(i == 7):
+                self.target = int(line)
+            i = i + 1
+        
+
 

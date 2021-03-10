@@ -1,0 +1,8 @@
+Settings file for the Brasseur
+
+heatMode
+9 
+
+target
+59 
+

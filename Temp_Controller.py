@@ -1,9 +1,11 @@
 #http://thinkingtkinter.sourceforge.net/all_programs.html
 from tkinter import *
+from tkinter import messagebox
 import DS18B20_Module_Class_AK
 import LCD1602_Module_AK as LCD1602
 import Brew_Logic_Class
 import time
+import Brew_Recording
 
 #Constants
 bPadx = "1m"
@@ -14,12 +16,13 @@ bFont = ""
 
 class ThermControl:
     def __init__(self, parent):
-        
+        self.switch_thermometers = False
         ### Instance variables ###
         self.tempsFile = './tempsF.txt'
         self.MyParent = parent
         self.temporaryHM = IntVar()
         self.temporaryHE = IntVar()
+        self.temporaryRT = IntVar()
             ## For the timers
         self.bStartTimer = list()
         self.chTLink = list()
@@ -38,7 +41,8 @@ class ThermControl:
         self.lcd.message = "Ain't no party \n  like MNTP"
         self.therm = DS18B20_Module_Class_AK.DS18B20()
         self.therm.findDevices()
-        self.logic = Brew_Logic_Class.BrewLogic()
+        self.logic = Brew_Logic_Class.BrewLogic(self.therm.nThermometers)
+        self.record = Brew_Recording.BrewRecord()
         
         ### Make Frames ###
         self.myParent = parent
@@ -68,12 +72,12 @@ class ThermControl:
                                font = "TkDefaultFont 20 bold",
                                background = self.dispFrame["background"])
         self.lblTAname = Label(self.dispFrame,
-                               text="A: ",
-                               font = "TkDefaultFont 20 bold",
+                               text="Boil /\n Heat Pad: ",
+                               font = "TkDefaultFont 18 bold",
                                background = self.dispFrame["background"])
         self.lblTBname = Label(self.dispFrame,
-                               text="B: ",
-                               font = "TkDefaultFont 20 bold",
+                               text="Mash/\nFermentor: ",
+                               font = "TkDefaultFont 18 bold",
                                background = self.dispFrame["background"])
         self.lblHeaters = Label(self.dispFrame,
                                text="Heaters",
@@ -142,12 +146,16 @@ class ThermControl:
             from_=212, to_=50,
             borderwidth=2, relief = "solid")
 
-        self.slTarget.set(190)
+        self.slTarget.set(self.logic.target)
         
         # Enable heaters and heat mode radio buttons
-        self.cHEnable = Checkbutton(self.controlFrame, text = "Enable Heaters",
+        self.chEnable = Checkbutton(self.controlFrame, text = "Enable Heaters",
                                     variable = self.temporaryHE,
                                     onvalue = 1, offvalue = 0)
+        self.chRecord = Checkbutton(self.controlFrame, text = "Record Temps",
+                                    variable = self.temporaryRT,
+                                    onvalue = 1, offvalue = 0)
+        
         self.rMode1 = Radiobutton(self.controlFrame, text = "Heating",
                                   variable = self.temporaryHM, value = 0)
         self.rMode2 = Radiobutton(self.controlFrame, text = "Maintain",
@@ -156,13 +164,16 @@ class ThermControl:
                                   variable = self.temporaryHM, value = 2)
         self.rMode4 = Radiobutton(self.controlFrame, text = "Off",
                                   variable = self.temporaryHM, value = 9)
+
         # Controls gridding
         self.lblTarget.grid(row=1, column=2,
                             padx=10, pady=5)
         self.slTarget.grid(row=2, column = 2,
                            padx = 25, pady=5)
-        self.cHEnable.grid(row = 4, column = 2, sticky = W,
-                           padx = 25, pady=10)
+        self.chEnable.grid(row = 4, column = 2, sticky = W,
+                           padx = 25, pady=5)
+        self.chRecord.grid(row = 5, column = 2, sticky = W,
+                           padx = 25, pady = 5)
         self.rMode1.grid(row = 6, column = 2, sticky = W,
                          padx = 25, pady=4)
         self.rMode2.grid(row = 7, column = 2, sticky = W,
@@ -171,7 +182,17 @@ class ThermControl:
                          padx = 25, pady=4)
         self.rMode4.grid(row = 9, column = 2, sticky = W,
                          padx = 25, pady=4)
+        #Initialize the radiobutton
         
+        if(self.logic.heatMode==0): # Set the radio buttons to the operating mode
+            self.rMode1.select()    # that the logic controller came up with
+        elif(self.logic.heatMode==1):
+            self.rMode2.select()
+        elif(self.logic.heatMode==2):
+            self.rMode3.select()
+        else:
+            self.rMode4.select()
+            
         # Scheduling
         self.nTimers = 7
         self.lblTimerTop = Label(self.schedFrame,text = "   Message \n Rem Time      Temp",
@@ -243,10 +264,10 @@ class ThermControl:
                       font = "TkDefaultFont 15 bold",
                     padx = 10, pady = 10,
                     borderwidth = 2, relief = "solid")
-        self.lblTint = Label(self.topBarFrame,
-                      font = "TkDefaultFont 15 bold", bg = "khaki1",
-                    padx = 10, pady = 10,
-                    borderwidth = 2, relief = "solid")
+#         self.lblTint = Label(self.topBarFrame,
+#                       font = "TkDefaultFont 15 bold", bg = "khaki1",
+#                     padx = 10, pady = 10,
+#                     borderwidth = 2, relief = "solid")
         self.bAcknowledge = Button(self.topBarFrame,
                              command = self.acknowledgeAlarms,
                              text = "Acknowledge",
@@ -255,35 +276,38 @@ class ThermControl:
                              width = 12)
         #Gridding up the top bar
         self.lblAlarm.grid(row = 2, column = 7)
-        self.lblTint.grid(row = 2, column = 4, sticky = W)
+        #self.lblTint.grid(row = 2, column = 4, sticky = W)
         self.bAcknowledge.grid(row=2, column = 11, sticky = E)
         
     
     def updateTemps(self):
        # get the temps from the stuff
         self.therm.readTempsFile()
+        # Temp fix
+        if(self.switch_thermometers):
+            self.therm.tempF = [self.therm.tempF[1], self.therm.tempF[0]]
         self.logic.thermTimeStamp = self.therm.timeStamp
         self.logic.target = self.slTarget.get()
         self.logic.heatMode = self.temporaryHM.get()
         self.logic.heatEnabled = self.temporaryHE.get()
-        self.therm.tempF = [self.therm.tempF[2], self.therm.tempF[1], self.therm.tempF[0]]
+        #self.therm.tempF = [self.therm.tempF[1], self.therm.tempF[1], self.therm.tempF[0]]
         self.logic.tempF = self.therm.tempF
         self.logic.brewCompute()
-        LCD1602.dispTemps(self.lcd, self.therm.tempF)
+        LCD1602.dispTemps(self.lcd, self.therm.tempF, self.logic.target, self.logic.heatOn[0], self.logic.dtdT[0])
         root.after(100, self.updateOtherThings)
         
         
     def updateOtherThings(self):
         # Update Temps
         self.lblTA["text"] = str(round(self.therm.tempF[0],1))
-        self.lblTB["text"] = str(round(self.therm.tempF[2],1))
+        self.lblTB["text"] = str(round(self.therm.tempF[1],1))
         self.lbldTAdt["text"] = str(round(self.logic.dtdT[0],2)) + "°/m"
         self.lbldTBdt["text"] = str(round(self.logic.dtdT[1],2)) + "°/m"
-        self.lblTint["text"] = "Int: " + str(int(round(self.therm.tempF[1],0)))
-        if(self.therm.tempF[1]>90.0):
-            self.lblTint["bg"] = "firebrick1"
-        else:
-             self.lblTint["bg"] = "gainsboro"   
+        #self.lblTint["text"] = "Int: " + str(int(round(self.therm.tempF[1],0)))
+        #if(self.therm.tempF[1]>90.0):
+        #    self.lblTint["bg"] = "firebrick1"
+        #else:
+        #     self.lblTint["bg"] = "gainsboro"   
         # Update Disabled / On/Off
         if(self.logic.heatEnabled):
             self.lblHeatEnabled.configure(text= "ENABLED", bg = "DeepPink2")
@@ -299,7 +323,15 @@ class ThermControl:
             self.lblH2.configure(text = "OFF", bg = "gainsboro")
         self.alarmHandling()
         self.timerHandling(-1)
-        self.logic.saveSettingsFile()
+        if(self.record.recording==False)&(self.temporaryRT.get()>0): # If we weren't recording but want to
+            answer = messagebox.askyesno("Erase contents?","Would you like to erase the previously recorded temperatures?")
+            self.record.startRecord(answer)
+        elif(self.record.recording)&(self.temporaryRT.get()>0): #If we were already recording and want to keep recording
+            self.record.tempF = self.logic.tempF
+            self.record.recordTemps()
+        else: # If we want to stop recording
+            self.record.recording = False
+
         root.after(100, self.updateTemps)
         
     def alarmHandling(self):

@@ -68,17 +68,19 @@ def welcomeScreen(lcd, delay):
    # print(lcd.message)
     sleep(delay)
     
-def dispTemps(lcd, temps):
+def dispTemps(lcd, temps, target, heatOn, dTAdt):
     TA = temps[0]
-    TB = temps[2]
+    TB = temps[1]
     Tint = temps[1]
-            
+    strHeatOn = "OFF"
+    
+    if(heatOn):
+        strHeatOn = " ON"
     # Display the temps
-    line1 = "  A    B     int"
-    line2 = "%2.1f  %2.1f  %d" % (TA, TB, Tint)
-    lcd.message = line1 + "\n" + line2
-   # print(lcd.message)
+    line1 = "A:%2.1f x:%d %3.2f" % (TA, target, dTAdt)
+    line2 = "%2.1f  %d %s" % (TB, Tint, strHeatOn)
+    lcd.message = line1 + "     \n" + line2 + "        "
+    #print(lcd.message)
     
     
 print("LCD1602 Module Loaded")
-

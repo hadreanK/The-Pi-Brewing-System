@@ -1,9 +1,11 @@
 import glob
 import time
 
+
 class DS18B20():
     def __init__(self):
         self.dir = '/sys/bus/w1/devices/'
+        self.thermIDs = []
         self.tempsFile = './tempsF.txt'
         self.tempFiles = []
         self.nThermometers = 0
@@ -16,6 +18,8 @@ class DS18B20():
     def findDevices(self):
         device_folders = glob.glob(self.dir + '28*')
         for folder in device_folders:
+            ID = folder.split('/')[-1]
+            self.thermIDs.append(ID)
             temp_file = folder + '/temperature'
             self.tempFiles.append(temp_file)
             self.nThermometers = self.nThermometers+1
@@ -36,44 +40,12 @@ class DS18B20():
             self.tempF.append(temp)
         self.timeStamp = time.time()
             
-    def updateNextTemp(self):
-        f = open(self.tempFiles[self.nextTempToUpdate])
-        line = f.readlines()
-        f.close
-        temp = float(line[0])
-        self.tempC[self.nextTempToUpdate] = temp/1000.0
-        self.tempF[self.nextTempToUpdate] = (temp*9/5+32.0)/1000.0
-            #iterate nextTempToUpdate
-        self.nextTempToUpdate = (self.nextTempToUpdate + 1)%self.nThermometers
-        
-
-    def getLabelledTemps(self, conv_to_degF):
-        raw = getAllTemps(conv_to_degF)
-        # 0 -> A
-        # 1 -> Internal
-        # 2 -> B
-        labelled = [ ['A', raw[0]], \
-                     ['B', raw[2]], \
-                     ['internal', raw[1]]]
-        return(labelled)
-        
-        
-    def updateTempOld(self, conv_to_degF):
-        base_dir = '/sys/bus/w1/devices/'
-        device_folder = glob.glob(base_dir + '28*')[0]
-        device_file = device_folder + '/temperature'
-        
-        f = open(device_file, 'r')
-        lines = f.readlines()
-        f.close()
-        
-        temp = float(lines[0])
-        temp = temp / 1000.0 # Get temp in celcius
-        if(conv_to_degF):
-            temp = temp * 9 / 5 + 32
-        return(temp)
     
     def readTempsFile(self):
+        '''
+        This method reads the most recent temperatures written to
+        the temperature file.
+        ''' 
         f = open(self.tempsFile, 'r')
         lines = f.readlines()
         f.close()
@@ -86,18 +58,35 @@ class DS18B20():
             i = i + 1
                 
     def writeTempsFile(self):
-        f = open(self.tempsFile, 'w')
-        f.write(str(self.timeStamp) + "\n")
+        '''
+        This method writes the temps to the file
+        '''
+        if(self.nThermometers>0):                
+            f = open(self.tempsFile, 'w')
+            f.write(str(self.timeStamp) + "\n")
+            for i in range(0,self.nThermometers):
+                f.write(str(self.tempF[i]) + "\n")
+            f.close()
+            print('Temps written to file')
+        else:
+            print("No thermometers loaded, nothing written to the file!")
+    def roundTemps(self, nDigits):
         for i in range(0,self.nThermometers):
-            f.write(str(self.tempF[i]) + "\n")
-        f.close()
-        
+            self.tempF[i] = round(self.tempF[i],nDigits)
+            self.tempC[i] = round(self.tempC[i],nDigits)
 print("DS12B20 Module Loaded.")
 
 #debug
-#myTemps = DS18B20()
-#myTemps.findDevices()
-#print(myTemps.tempC)
-#print(myTemps.nThermometers)
-#myTemps.getAllTemps()
-#myTemps.writeTempsFile()
+# myTemps = DS18B20()
+# myTemps.findDevices()
+# print(myTemps.tempC)
+# print(myTemps.nThermometers)
+# myTemps.getAllTemps()
+# myTemps.writeTempsFile()
+# print(myTemps.thermIDs)
+# myTemps.roundTemps(1)
+# print(myTemps.tempC)
+# myTemps.getAllTemps()
+# myTemps.writeTempsFile()
+# myTemps.readTempsFile()
+# print(myTemps.tempC)
