@@ -8,22 +8,20 @@ import time
 import Brew_Recording
 
 #Constants
-bPadx = "1m"
-bPady = "1m"
-bIPadx = "1m"
-bIPady = "1m"
-bFont = ""
+
 
 class ThermControl:
     def __init__(self, parent):
         self.switch_thermometers = False
-        ### Instance variables ###
+        self.iPadx = "1m"
+        self.iPady = "1m"
         self.tempsFile = './tempsF.txt'
         self.MyParent = parent
         self.temporaryHM = IntVar()
         self.temporaryHE = IntVar()
         self.temporaryRT = IntVar()
-            ## For the timers
+            
+        ## For the timers
         self.bStartTimer = list()
         self.chTLink = list()
         self.chTChangeT = list()
@@ -43,28 +41,29 @@ class ThermControl:
         self.therm.findDevices()
         self.logic = Brew_Logic_Class.BrewLogic(self.therm.nThermometers)
         self.record = Brew_Recording.BrewRecord()
-        
+    
+    #def create_(self):    
         ### Make Frames ###
         self.myParent = parent
         self.topContainer = Frame(parent, bg = "azure")
-        self.topContainer.grid(ipadx = bIPadx, ipady = bIPady)
+        self.topContainer.grid(ipadx = self.iPadx, ipady = self.iPady)
         self.dispFrame = Frame(self.topContainer, background = "azure",
                                borderwidth = 3, relief = "solid")
-        self.dispFrame.grid(ipadx = bIPadx, ipady = bIPady,
+        self.dispFrame.grid(ipadx = self.iPadx, ipady = self.iPady,
                             column = 1, row = 2)
         self.controlFrame = Frame(self.topContainer, background = "azure",
                                   borderwidth = 3, relief = "solid")
-        self.controlFrame.grid(ipadx = bIPadx, ipady = bIPady,
+        self.controlFrame.grid(ipadx = self.iPadx, ipady = self.iPady,
                                column = 2, row = 2)
         self.schedFrame = Frame(self.topContainer, background = "azure",
                                 borderwidth = 3, relief = "solid")
-        self.schedFrame.grid(ipadx = bIPadx, ipady = bIPady,
+        self.schedFrame.grid(ipadx = self.iPadx, ipady = self.iPady,
                              column = 3, row = 2)
         self.botBarFrame = Frame(self.topContainer)
-        #self.botBarFrame.grid(ipadx = bIPadx, ipady = bIPady,
+        #self.botBarFrame.grid(ipadx = self.iPadx, ipady = self.iPady,
                               #column = 1, row = 3, columnspan = 2)
         self.topBarFrame = Frame(self.topContainer, bg = "azure")
-        self.topBarFrame.grid(ipadx = bIPadx, ipady = bIPady,
+        self.topBarFrame.grid(ipadx = self.iPadx, ipady = self.iPady,
                               column = 1, row = 0, columnspan = 4)        
         ### Fill Display Frame ###
         self.lblthermometers = Label(self.dispFrame,

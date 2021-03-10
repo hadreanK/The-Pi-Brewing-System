@@ -34,9 +34,11 @@ def write_string_to_file(filepath,string):
 
 class BrewLog():
     def __init__(self):
-        self.brew_id = None # string of the format 2103 - Fuggle IPA
-        self.filepath = None
-        self.backup_filepath = None
+        self.brew_id = '' # string of the format 2103 - Fuggle IPA
+        self.filepath = ''
+        self.backup_filepath = ''
+        self.log_file_exists = False
+        self.new_or_continue = ''
         self.imported_log_file_text = []
         self.new_log_file_text = []
         self.log_header = [] 
@@ -48,17 +50,36 @@ class BrewLog():
         self.temperature_reading = 0.0
         self.temperature_history = []
     
-    def start_ferment_record(self):
-        # This will record the 
-        self.ferm_start_time = time.time()
-              
+    def start_ferment_recording(self):
+        # This method will begin the process for starting 
+        # the fermentation record
+        # If it's already been recording, then just continue
+        
+        self.open_log_file()
+        
+        if self.log_file_exists:
+            self.new_or_continue = 'continue'
+            self.parse_log_file()
+            
+        else:
+            self.new_or_continue = 'new'
+            #self.ferm_start_time = time.time()
+            #self.write_default_file()
+            self.err = True
+            print('No file detected, please make a default file.')
+        
+
+            
+
     def create_header(self):
         self.log_header.append('    HEADER')
         self.log_header.append('Brew Log written by Adrian Kirn')
         now = datetime.datetime.now()
-        date_str = now.strftime("%Y-%m-%d %Hh%M")
-        self.log_header.append('Last updated: ' + date_str)
-        self.log_header.append('Fermentation started on:' + str(self.ferm_start_time))
+        update_str = now.strftime("%Y-%m-%d %Hh%M")
+        self.log_header.append('Last updated: ' + update_str)
+        start_date = datetime.fromtimestamp(self.ferm_start_time)
+        start_str = start_date.strftime("%Y-%m-%d %Hh%M")
+        self.log_header.append('Fermentation started on:' + start_str)
         
     def write_default_file(self):
         self.create_header()
@@ -83,10 +104,12 @@ class BrewLog():
 
         try:
             f = open(self.filepath,'r') # Open the file for reading only
+            self.log_file_exists = True
         except:
-            print('Error, could not open log_file')
-            self.err = True
-        if not self.err:
+            print('Log file does not exist.')
+            self.log_file_exists = False
+
+        if self.log_file_exists:
             self.imported_log_file_text = f.read().split('\n')    
         
     def parse_log_file(self):
@@ -98,6 +121,9 @@ class BrewLog():
             else: #if it's not a section break, then make record it
                 if section==0:
                     self.log_header.append(line)
+                    if 'Fermentation started on:' in line:
+                        self.ferm_start_time = str(line.split(':')[-1])
+                        print(self.ferm_start_time)
                 elif section==1:
                     self.log_recipe.append(line)
                 elif section==2:
@@ -105,14 +131,17 @@ class BrewLog():
                 else:
                     print('Error reading file. Too many sections')
                     self.err = True
-   
+        # Parse the header
+        
+
     def record_temperature(self, temperature):
         now = datetime.datetime.now()
         date_str = now.strftime("%Y-%m-%d %Hh%M")
         temperature = round(temperature,1)
         log_str = date_str + ', ' + str(temperature)
-        self.log_temps.append(log_str)
-                
+        #self.log_temps.append(log_str)
+         self.log_temps[-1] = log_str # RN it's putting a blank line at the end of the file
+         # so by setting the last element it's not putting a line b/t each temp recording
             
     def write_new_file(self, overwrite=True, backup_old_file = False):
         self.set_filepaths()
@@ -139,16 +168,14 @@ print("Imported brew logging module")
 brewy = BrewLog()
 brewy.brew_id = '2103 - Fuggle IPA'
 #brewy.write_default_file()
-#brewy.start_ferment_record()
-brewy.temperature_reading = 63.0
-#brewy.write_default_file()
-brewy.open_log_file()
-brewy.parse_log_file()
-brewy.record_temperature(63.1865)
-brewy.write_new_file(backup_old_file=True)
+brewy.start_ferment_recording()
+#brewy.temperature_reading = 63.0
+
+#brewy.record_temperature(63.1865)
+#brewy.write_new_file(backup_old_file=True)
 
 
-#print(brewy.log_header)
+print(brewy.log_header)
 #print(brewy.log_recipe)
 #print(brewy.log_temps)
 
