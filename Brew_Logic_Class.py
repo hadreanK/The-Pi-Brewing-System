@@ -13,9 +13,11 @@ class BrewLogic():
         self.heatOn = [False, False]
         self.heatEnabled = False
         self.goodEnoughThreshold =200.0
+        self.thermometer_no_resp_limit = 20.0
         self.holdingDuty = 0.70
         self.target = 0
         self.heatMode = 0
+        self.thermometer_error = False # If there's an error with the thermoemeters, set this b/c it's good to know!
         
         # Alarm Settings
         self.alarm = False
@@ -91,10 +93,13 @@ class BrewLogic():
             self.heatMode = 9 # Turn it off
         
         # If the temperature we're working with is super old, then set an alarm
-        if((time.time() - self.thermTimeStamp)>60.0):
+        if (time.time() - self.thermTimeStamp) > self.thermometer_no_resp_limit:
             self.alarm = True
             self.alarmText = "Thermometer Error!"
             self.heatMode = 9 # Turn it off!
+            self.thermometer_error = True # Set the thermometer error
+        else:
+            self.thermometer_error = False # Otherwise clear the thermometer error
         
         # Play sound
         if(self.alarm):

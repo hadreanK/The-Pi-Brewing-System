@@ -140,8 +140,8 @@ class BrewLog():
         temperature = round(temperature,1)
         log_str = date_str + ', ' + str(temperature)
         #self.log_temps.append(log_str)
-         self.log_temps[-1] = log_str # RN it's putting a blank line at the end of the file
-         # so by setting the last element it's not putting a line b/t each temp recording
+        self.log_temps[-1] = log_str # RN it's putting a blank line at the end of the file
+        # so by setting the last element it's not putting a line b/t each temp recording
             
     def write_new_file(self, overwrite=True, backup_old_file = False):
         self.set_filepaths()
