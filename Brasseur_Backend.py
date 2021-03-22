@@ -33,10 +33,11 @@ while(True):
         myTemps.roundTemps(1)
         recordTemps = True
 
-        for i in range(0,2): # For each temperature saved
-            for j in range(0,myTemps.nThermometers): # For each thermometer
+        for i in range(0,myTemps.nThermometers): # For each thermometer
+            for j in range(0,3): # For each temperature saved
                 # If there's not a huge change in temperature, then save them 
-                if (abs(prevTemps[i][j]-myTemps.tempF[i]) > tempDiffThreshold):
+                #print("i = " + str(i) + ",   j = " + str(j))
+                if (abs(prevTemps[j][i]-myTemps.tempF[i]) > tempDiffThreshold):
                     print("Large change in temperature")
                     print(prevTemps[i][j])
                     print(myTemps.tempF[i*2])

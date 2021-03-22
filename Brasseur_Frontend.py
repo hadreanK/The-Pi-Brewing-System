@@ -1,5 +1,10 @@
-# -*- coding: utf-8 -*-
-#http://thinkingtkinter.sourceforge.net/all_programs.html
+'''http://thinkingtkinter.sourceforge.net/all_programs.html
+When reading this, keep in mind that I started this project as
+a way to learn Python and have been coming back to it as I've
+gotten much better at it. Especially the earlier things are
+written as a beginner...
+
+'''
 from tkinter import *
 from tkinter import messagebox
 import DS18B20_Module_Class_AK
@@ -9,7 +14,7 @@ import time
 import Brew_Recording
 import Brew_Logging
 import subprocess
-
+import SMS_Emailer
 #Constants
 
 
@@ -20,6 +25,7 @@ class ThermControl:
         self.iPadx = "1m"
         self.iPady = "1m"
         self.tempsFile = './tempsF.txt'
+        self.brew_id = '' # string of the format 2103 - Fuggle IPA
         self.parent = parent
         self.backend_process = None
         self.backend_stdout = None
@@ -29,13 +35,13 @@ class ThermControl:
         self.temporaryRT = IntVar()
         self.temporaryAR = IntVar()
             
-        ## For the timers
+        ## For the timetemporaryARrs
         self.bStartTimer = list()
         self.chTLink = list()
         self.chTChangeT = list()
         self.enTarget = list()
         self.enTimeSet = list()
-        self.enTMessage = list()
+        self.enTMessage = list()    
         self.lblTimeLeft = list()
         self.vTLink = []
         self.vTChangeT = []
@@ -47,9 +53,10 @@ class ThermControl:
         self.lcd.message = "Ain't no party \n  like MNTP"
         self.therm = DS18B20_Module_Class_AK.DS18B20()
         self.therm.findDevices()
-        self.logic = Brew_Logic_Class.BrewLogic(self.therm.nThermometers)
-        self.record = Brew_Recording.BrewRecord()
-    
+        self.logic = Brew_Logic_Class.BrewLogic(self, self.therm.nThermometers)
+        #self.record = Brew_Recording.BrewRecord()
+        self.logging = Brew_Logging.BrewLog(self)
+        
     def create_monitor_display(self):    
         self.dispFrame = Frame(self.topContainer, background = "azure",
                                borderwidth = 3, relief = "solid")
@@ -105,19 +112,27 @@ class ThermControl:
                       font= "TkDefaultFont 16 bold",
                       padx = 8, pady = 0,
                       borderwidth=2, relief = "solid")
+        self.lblHeatAverage = Label(self.dispFrame,
+                               text="dT/dt Timespan",
+                               font = "TkDefaultFont 12 bold",
+                               background = self.dispFrame["background"])
+        self.enHeatTimeframe = Entry(self.dispFrame, width=5, relief="solid", bd=2)
+        self.enHeatTimeframe.delete(0,END)
+        self.enHeatTimeframe.insert(0,self.logic.heat_average_time)
 
         # Grid em up - Display
-        self.lblthermometers.grid(row = 1, column = 2, columnspan = 3, padx = 10, pady = 10)
+        #self.lblthermometers.grid(row = 1, column = 2, columnspan = 3, padx = 10, pady = 10)
         self.lblTAname.grid(row=2, column = 2, padx = 5, pady = 5)
         self.lblTBname.grid(row=4, column = 2, padx = 5, pady = 5) 
-        self.lblTA.grid(row=2, column = 3, sticky=W, padx = 10, pady = 5)
-        self.lblTB.grid(row=4, column = 3, sticky=W, padx = 10, pady = 5)
-        self.lbldTAdt.grid(row=2, column = 4, sticky=W, padx = 10, pady = 5)
-        self.lbldTBdt.grid(row=4, column = 4, sticky=W, padx = 10, pady = 5)
-        self.lblHeaters.grid(row = 6, column = 2, columnspan = 3, padx = 10, pady = 10)
-        self.lblH1.grid(row = 8, column = 3, padx = 10, pady = 5)
-        self.lblH2.grid(row = 8, column = 4, padx = 10, pady = 5)
-        self.lblHeatEnabled.grid(row = 7, column = 2, columnspan = 3, padx = 10, pady =5)
+        self.lblTA.grid(row=2, column = 3, sticky=W, padx = 5, pady = 5)
+        self.lblTB.grid(row=4, column = 3, sticky=W, padx = 5, pady = 5)
+        self.lbldTAdt.grid(row=2, column = 4, sticky=W, padx = 5, pady = 5)
+        self.lbldTBdt.grid(row=4, column = 4, sticky=W, padx = 5, pady = 5)
+        self.lblHeaters.grid(row = 6, column = 2, columnspan = 1, padx = 5, pady = 10)
+        self.lblHeatEnabled.grid(row = 6, column = 3, padx = 5, pady =5)
+        self.lblH1.grid(row = 6, column = 4, padx = 5, pady = 5)
+        self.lblHeatAverage.grid(row = 8, column = 3,  padx = 5, pady =5)
+        self.enHeatTimeframe.grid(row = 8, column = 4, padx = 5, pady =5)
 
     def create_top_container(self):
         self.topContainer = Frame(self.parent, bg = "azure")
@@ -127,29 +142,32 @@ class ThermControl:
         self.controlFrame = Frame(self.topContainer, background = "azure",
                                   borderwidth = 3, relief = "solid")
         self.controlFrame.grid(ipadx = self.iPadx, ipady = self.iPady,
-                               column = 2, row = 2)
+                               column = 1, row = 3)
         # Target temperature slider
         self.lblTarget = Label(self.controlFrame,
-                               text="Target\nTemperature",
+                               text="Target",
                                font= "TkDefaultFont 12",
                                bg = "gainsboro",
                                padx = 8, pady = 0,
                                borderwidth=2, relief = "solid")
         self.slTarget = Scale(
             self.controlFrame,
-            length=200,
-            from_=212, to_=50,
-            borderwidth=2, relief = "solid")
+            length=300,
+            from_=40, to_=212,
+            borderwidth=2, relief = "solid",
+            orient=HORIZONTAL)
 
         
-        # Enable heaters and heat mode radio buttons
+        # Create enable heaters and heat mode radio buttons
         self.chEnable = Checkbutton(self.controlFrame, text = "Enable Heaters",
                                     variable = self.temporaryHE,
                                     onvalue = 1, offvalue = 0)
         self.chRecord = Checkbutton(self.controlFrame, text = "Record Temps",
                                     variable = self.temporaryRT,
                                     onvalue = 1, offvalue = 0)
-        
+        self.bRecordTemps = Button(self.controlFrame, text = "Start", font="TkDefaultFont 10",
+                                command = self.toggle_logging)
+        self.enBrewID = Entry(self.controlFrame, width=25, relief="solid", bd=2)
         self.rMode1 = Radiobutton(self.controlFrame, text = "Heating",
                                   variable = self.temporaryHM, value = 0)
         self.rMode2 = Radiobutton(self.controlFrame, text = "Maintain",
@@ -160,22 +178,28 @@ class ThermControl:
                                   variable = self.temporaryHM, value = 9)
 
         # Controls gridding
-        self.lblTarget.grid(row=1, column=2,
-                            padx=10, pady=5)
-        self.slTarget.grid(row=2, column = 2,
-                           padx = 25, pady=5)
-        self.chEnable.grid(row = 4, column = 2, sticky = W,
-                           padx = 25, pady=5)
-        self.chRecord.grid(row = 5, column = 2, sticky = W,
-                           padx = 25, pady = 5)
-        self.rMode1.grid(row = 6, column = 2, sticky = W,
-                         padx = 25, pady=4)
-        self.rMode2.grid(row = 7, column = 2, sticky = W,
-                         padx = 25, pady=4)
-        self.rMode3.grid(row = 8, column = 2, sticky = W,
-                         padx = 25, pady=4)
-        self.rMode4.grid(row = 9, column = 2, sticky = W,
-                         padx = 25, pady=4)     
+        c_padx = 4
+        c_pady = 2
+        #.grid(row=1, column=2,
+        #                    padx=10, pady=5)
+        self.slTarget.grid(row=2, column = 2, columnspan = 4,
+                           padx = c_padx, pady=c_pady)
+        self.chEnable.grid(row = 3, column = 4, sticky = W,
+                           padx = c_padx, pady=c_pady)
+        #self.chRecord.grid(row = 4, column = 2, sticky = W,
+        #                   padx = c_padx, pady = 5)
+        self.bRecordTemps.grid(row = 3, column = 5, sticky = W,
+                           padx = c_padx, pady = c_pady)
+        self.enBrewID.grid(row = 4, column = 4, columnspan = 2, sticky = W,
+                        padx = c_padx, pady = c_pady)
+        self.rMode1.grid(row = 3, column = 2, sticky = W,
+                         padx = c_padx, pady=c_pady)
+        self.rMode2.grid(row = 4, column = 2, sticky = W,
+                         padx = c_padx, pady=c_pady)
+        self.rMode3.grid(row = 3, column = 3, sticky = W,
+                         padx = c_padx, pady=c_pady)
+        self.rMode4.grid(row = 4, column = 3, sticky = W,
+                         padx = c_padx, pady=c_pady)     
 
     def initialize_controls(self):    
         #Initialize the radiobutton
@@ -190,32 +214,36 @@ class ThermControl:
             self.rMode4.select()
         
         self.slTarget.set(self.logic.target)
-    
- 
+        if self.logic.auto_reset_backend:
+            self.temporaryAR = IntVar(value=True)
+        self.enBrewID.delete(0,END)
+        self.enBrewID.insert(0,self.brew_id)
+        
+
     def create_scheduling(self):       
         self.schedFrame = Frame(self.topContainer, background = "azure",
                                 borderwidth = 3, relief = "solid")
         self.schedFrame.grid(ipadx = self.iPadx, ipady = self.iPady,
-                             column = 3, row = 2)
+                             column = 3, row = 2, rowspan=3)
         # Scheduling
         self.nTimers = 7
         self.lblTimerTop = Label(self.schedFrame,text = "   Message \n Rem Time      Temp",
                             font = "TkDefaultFont 16")
         #self.bStartAllTimers = Button(self.schedFrame, command = self.timer_handling(),
         #              text = "Start All", font = "TkDefaulTFont 14" , padx = 5, pady = 5)
-        self.bStartTimer.append(Button(self.schedFrame, text = "Start", font="TkDefaultFont 10",
+        self.bStartTimer.append(Button(self.schedFrame, text = "Start 1", font="TkDefaultFont 10",
                                            command = lambda: self.timer_handling(0)))
-        self.bStartTimer.append(Button(self.schedFrame, text = "Start", font="TkDefaultFont 10",
+        self.bStartTimer.append(Button(self.schedFrame, text = "Start 2", font="TkDefaultFont 10",
                                            command = lambda: self.timer_handling(1)))
-        self.bStartTimer.append(Button(self.schedFrame, text = "Start", font="TkDefaultFont 10",
+        self.bStartTimer.append(Button(self.schedFrame, text = "Start 3", font="TkDefaultFont 10",
                                            command = lambda: self.timer_handling(2)))
-        self.bStartTimer.append(Button(self.schedFrame, text = "Start", font="TkDefaultFont 10",
+        self.bStartTimer.append(Button(self.schedFrame, text = "Start 4", font="TkDefaultFont 10",
                                            command = lambda: self.timer_handling(3)))
-        self.bStartTimer.append(Button(self.schedFrame, text = "Start", font="TkDefaultFont 10",
+        self.bStartTimer.append(Button(self.schedFrame, text = "Start 5", font="TkDefaultFont 10",
                                            command = lambda: self.timer_handling(4)))
-        self.bStartTimer.append(Button(self.schedFrame, text = "Start", font="TkDefaultFont 10",
+        self.bStartTimer.append(Button(self.schedFrame, text = "Start 6", font="TkDefaultFont 10",
                                            command = lambda: self.timer_handling(5)))
-        self.bStartTimer.append(Button(self.schedFrame, text = "Start", font="TkDefaultFont 10",
+        self.bStartTimer.append(Button(self.schedFrame, text = "Start 7", font="TkDefaultFont 10",
                                            command = lambda: self.timer_handling(6)))
         
         # Timer boxes
@@ -242,7 +270,7 @@ class ThermControl:
         #self.bStartAllTimers.grid(row=1, column=5)        
         for i in range(0,self.nTimers):
             self.bStartTimer[i].grid(row=2*i+3, column=5)
-            self.chTLink[i].grid(row=2*i+4, column=3)
+            #self.chTLink[i].grid(row=2*i+4, column=3)
             self.chTChangeT[i].grid(row=2*i+4, column=5)
             self.enTarget[i].grid(row=2*i+4, column=4)
             self.enTimeSet[i].grid(row=2*i+4, column=2)
@@ -297,6 +325,7 @@ class ThermControl:
         self.logic.target = self.slTarget.get()
         self.logic.heatMode = self.temporaryHM.get()
         self.logic.heatEnabled = self.temporaryHE.get()
+        self.logic.auto_reset_backend = self.temporaryAR.get()
         #self.therm.tempF = [self.therm.tempF[1], self.therm.tempF[1], self.therm.tempF[0]]
         self.logic.tempF = self.therm.tempF
         self.logic.brewCompute()
@@ -341,17 +370,17 @@ class ThermControl:
 
         self.alarm_handling()
         self.timer_handling(-1)
+        
+        temp_str = self.enHeatTimeframe.get()
+        if temp_str.replace('.','',1).isdigit(): #Check to see if it's a float or int format
+            self.logic.heat_average_time = float(temp_str)
+            self.enHeatTimeframe['bg'] = 'Chartreuse'
+        else:
+            self.enHeatTimeframe['bg'] = 'firebrick1'
+        self.brew_id = self.enBrewID.get()
+        self.logging.perform_logging_tasks()
 
-        if(self.record.recording==False)&(self.temporaryRT.get()>0): # If we weren't recording but want to
-            answer = messagebox.askyesno("Erase contents?","Would you like to erase the previously recorded temperatures?")
-            #self.record.startRecord(answer)
-        elif(self.record.recording)&(self.temporaryRT.get()>0): #If we were already recording and want to keep recording
-            #self.record.tempF = self.logic.tempF
-            #self.record.recordTemps()
-            pass
-        else: # If we want to stop recording
-            self.record.recording = False
-
+        
         root.after(100, self.update_temps)
         
     def alarm_handling(self):
@@ -409,6 +438,16 @@ class ThermControl:
         else:
             print('Invalid command sent to start_backend - nothing done.')
 
+    def toggle_logging(self):
+        # IF we're already logging, then stop logging
+        if self.logging.currently_logging: 
+            self.logging.currently_logging = False
+            self.bRecordTemps['text'] = "Start Logging"
+        else: # Otherwise if we're not, then start loggin!
+            self.logging.start_ferment_recording()
+            if self.logging.currently_logging: #Only change it if the user decided to start logging
+                self.bRecordTemps['text'] = "Stop Logging"
+
     def timer_handling(self, timerToStart):
         if(timerToStart<0):
             for i in range(0,self.nTimers):
@@ -456,26 +495,16 @@ brasseur = ThermControl(root)
 brasseur.create_top_container()
 brasseur.create_monitor_display()
 brasseur.create_controls()
+
 brasseur.initialize_controls()
 brasseur.create_scheduling()
 brasseur.create_top_Bar()
-
-#print("Backend is:")
-#print(brasseur.backend_process)
-#brasseur.start_backend()
-#print("Backend is now:")
-#print(brasseur.backend_process)
-
-#time.sleep(5)
-#print("Backend has error and:")
-#print(brasseur.backend_process)
-
-
 
 brasseur.update_temps() #Begin update loop
 
 print("Starting Tk loop. GLHF!")
 root.mainloop()
+brasseur.start_backend('end')
 print("Ended Tk loop. Cheers!")
 
 

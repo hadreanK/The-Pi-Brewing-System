@@ -1,8 +1,17 @@
 Settings file for the Brasseur
 
 heatMode
-9 
+1 
 
 target
-52 
+80 
+
+autoRestartBackend
+1 
+
+brew_id
+SPAM
+
+heat_average_time
+1.000000 
 
